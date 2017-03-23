@@ -190,8 +190,19 @@
 ;;;		Acciones posibles desde el estado actual o NIL si no hay acciones
 ;;;   posibles
 ;;;
- (defun navigate-white-hole (state worm-holes)
-   (navigate-worm-hole state worm-holes))
+(defun navigate-white-hole (state white-holes)
+ (when white-holes
+    (let ((navigate (navigate-white-hole state (rest white-holes))))
+      (if (eq state (first (first white-holes)))
+        (append (list
+                  (make-action
+                    :name 'navigate-white-hole
+                    :origin state
+                    :final (second (first white-holes))
+                    :cost (third (first white-holes))))
+                navigate)
+        navigate))))
+
 
 
 ;;; Casos de Prueba
@@ -238,8 +249,12 @@
    :f-goal-test #'(lambda (state)
                     (f-goal-test-galaxy state *planets-destination*))
    :f-h #'(lambda (state)
-              (f-h-galaxy (node-state state) *sensors*))
-   :operators (list 'navigate-worm-hole 'navigate-white-hole)))
+              (f-h-galaxy state *sensors*))
+   :operators (list #'(lambda (state)
+                        (navigate-worm-hole state *worm-holes*))
+                    #'(lambda (state)
+                        (navigate-white-hole state *white-holes*))
+                    )))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -259,24 +274,28 @@
 ;;;
 (defun expand-node (node problem)
   (mapcar #'(lambda (accion)
-                (let ((ge     (+ (node-g node) (action-cost accion)))
-                      (hache  (problem-f-h node)))
-                  (make-node
-                    :state (action-final accion)    ; state label
-                    :parent node                    ; parent node
-                    :action accion                  ; action that generated the current node from its parent
-                    :depth (+ (if (node-depth node)
-                                    (node-depth node)
-                                    0)
-                              1)  ; depth in the search tree
-                    :g ge                           ; cost of the path from the initial state to this node
-                    :h hache                        ; value of the heuristic
-                    :f (+ ge hache))                ; g + h
-                    )
-            )
-    (append (navigate-worm-hole (node-state node) *worm-holes*)
-            (navigate-white-hole (node-state node) *white-holes*))))
+              (let ((ge     (+ (node-g node) (action-cost accion)))
+                    (hache  (funcall (problem-f-h problem) (action-final accion))))
+                (make-node
+                 :state (action-final accion)    ; state label
+                 :parent node                    ; parent node
+                 :action accion                  ; action that generated the current node from its parent
+                 :depth (+ (if (node-depth node)
+                               (node-depth node)
+                             0)
+                           1)  ; depth in the search tree
+                 :g ge                           ; cost of the path from the initial state of this node
+                 :h hache                        ; value of the heuristic
+                 :f (+ ge hache))                ; g + h
+                )
+              )
+    (expand-aux node (problem-operators problem))))
 
+(defun expand-aux (node problem-operators)
+  (let ((acciones (funcall (first problem-operators) (node-state node))))
+    (if (rest problem-operators)
+        (append acciones (expand-aux node (rest problem-operators)))
+      acciones)))
 
 ;;; Casos de Prueba
 ;;; (setf node-00
@@ -394,9 +413,54 @@
 ;;;	OUTPUT:
 ;;;		Resulta de la busqueda realizada por la funcion graph-search-aux
 ;;;
-(defun graph-search (problem strategy)
 
-)
+(defun graph-search (problem strategy)
+  (let* ((nombre (problem-initial-state problem))
+         (heu (funcall (problem-f-h problem) nombre)))
+    (graph-search-algorithm problem
+                            strategy
+                            (list (make-node
+                                   :state nombre
+                                   :parent nil
+                                   :action nil
+                                   :depth 0
+                                   :g 0
+                                   :h heu
+                                   :f heu))
+                            (list nil))))
+
+(defun esta-en-cerrado (nodo closed-nodes)
+  (if (first closed-nodes)
+    (let ((nombre-nodo (node-state nodo))
+          (nombre-cerrado (node-state (first closed-nodes)))
+          (nodog (node-g nodo))
+          (cerradog (node-g (first closed-nodes))))
+      (if (eq nombre-nodo nombre-cerrado)
+        (when (< nodog cerradog)
+          (and t (esta-en-cerrado nodo (rest closed-nodes))))
+        (esta-en-cerrado nodo (rest closed-nodes))))
+    nodo))
+  
+
+(defun graph-search-algorithm (problem strategy open-nodes closed-nodes)
+  (let  ((nodo (first open-nodes)))
+    (when nodo
+      (let ((nodo-no-esta-cerrado (esta-en-cerrado nodo closed-nodes))
+            (nuevos-abiertos (rest open-nodes)))
+        (if (funcall (problem-f-goal-test problem) (node-state nodo))
+            nodo
+          (if nodo-no-esta-cerrado
+              (graph-search-algorithm problem
+                                      strategy
+                                      (insert-nodes-strategy (expand-node nodo problem)
+                                                             nuevos-abiertos
+                                                             strategy)
+                                      (cons nodo closed-nodes))
+            (graph-search-algorithm problem
+                                    strategy
+                                    nuevos-abiertos
+                                    closed-nodes)))))))
+
 ;;; Casos de Prueba
 ;;; (graph-search *galaxy-M35* *A-star*)
 ;;;
@@ -446,8 +510,12 @@
 ;;;         llegar al nodo o NIL.
 ;;;
 (defun tree-path (node)
+  (reverse (tree-path-aux node)))
 
-)
+(defun tree-path-aux (node)
+  (unless (null node)
+    (cons (node-state node)
+          (tree-path-aux (node-parent node)))))
 ;;; Casos de Prueba
 ;;;
 ;;; (tree-path nil) ; -> NIL
@@ -470,7 +538,12 @@
 ;;;		Lista con las acciones que se han realizado para llegar al  nodo o NIL.
 ;;;
 (defun action-sequence (node)
-)
+  (reverse (action-sequence-aux node)))
+
+(defun action-sequence-aux (node)
+  (unless (null (node-action node))
+    (cons (node-action node)
+          (action-sequence-aux (node-parent node)))))
 
 ;;; Casos de Prueba
 ;;;
