@@ -17,3 +17,6 @@ Realizada en Lisp
 - Manejo de Estructuras
 
 ## Practica 3
+Ralizada en PROLOG
+- Manejo de listas con operaciones
+- Predicados
