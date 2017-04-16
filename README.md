@@ -20,3 +20,8 @@ Realizada en Lisp
 Ralizada en PROLOG
 - Manejo de listas con operaciones
 - Predicados
+
+## Práctica 4
+Realizada en Lisp
+- Juego Mancala
+- Competición de Jugadores
