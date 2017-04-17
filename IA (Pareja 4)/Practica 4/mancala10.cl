@@ -31,7 +31,7 @@
 ;;;
 ;;; NUEVO EN LA VERSION 6.30
 ;;; - Incluye funciones de manejo de un tablero auxiliar
-;;; - Evita que quien devuelva un nº negativo muy grande (que puede pasar por nil) obtenga
+;;; - Evita que quien devuelva un nï¿½ negativo muy grande (que puede pasar por nil) obtenga
 ;;;   tablas. Del mismo modo, si el humano abandona no obtiene tablas sino que pierde.
 ;;;
 ;;; COMENTARIOS
@@ -751,9 +751,33 @@
 ;;; Implementacion del algoritmo negamax con poda alfa-beta
 ;;; ------------------------------------------------------------------------------------------
 
+(defun negamax-a-b (estado profundidad-max f-eval)
+  (let* ((oldverb *verb*)
+       (*verb* (if *debug-nmx* *verb* nil))
+       (estado2 (negamax-alfa-beta estado 0 t profundidad-max f-eval +min-val+ +max-val+)
+       (*verb* oldverb))
+  estado2))
 
-;;; (defun negamax-a-b (estado profundidad-max f-eval)
-;;;   ...)
+(defun negamax-alfa-beta (estado profundidad devolver-movimiento profundidad-max f-eval alfa beta)
+  (cond ((>= profundidad profundidad-max)
+         (unless devolver-movimiento  (funcall f-eval estado)))
+        (t
+         (let ((sucesores (generar-sucesores estado profundidad))
+                (mejor-sucesor nil))
+           (cond ((null sucesores)
+                  (unless devolver-movimiento  (funcall f-eval estado)))
+                 (t
+                  (loop for sucesor in sucesores do
+                    (let* ((result-sucesor (- (negamax-alfa-beta sucesor (1+ profundidad)
+                                        nil profundidad-max f-eval (- beta) (- alfa)))))
+                      ;(format t "~% Nmx-1 Prof:~A result-suc ~3A de suc ~A, mejor=~A" profundidad result-sucesor (estado-tablero sucesor) mejor-valor)
+                      (when (> result-sucesor alfa)
+                        (setq alfa result-sucesor)
+                        (setq mejor-sucesor  sucesor))
+                      (when (>= alfa beta)
+                        (return
+                          (if devolver-movimiento mejor-sucesor alfa)))))
+                  (if  devolver-movimiento mejor-sucesor alfa)))))))
 
 
 ;;; ------------------------------------------------------------------------------------------
@@ -794,8 +818,8 @@
 ;;; f-juego que utiliza busqueda negamax (con o sin poda)
 ;;; ------------------------------------------------------------------------------------------
 (defun f-j-nmx (estado profundidad-max f-eval)
-;;;(negamax-a-b estado profundidad-max f-eval))
-  (negamax estado profundidad-max f-eval))
+(negamax-a-b estado profundidad-max f-eval))
+;;;(negamax estado profundidad-max f-eval))
 
 
 ;;; f-juego para jugador chulo remoto (boaster)
@@ -950,7 +974,7 @@
 
 
 ;;; Ajustes para facilitar el seguimiento paso a paso (pag. 11). Reduzcase el nivel de
-;;; detalle cuando se vaya adquiriendo práctica.
+;;; detalle cuando se vaya adquiriendo prï¿½ctica.
 ;;; *debug-nmx* activa *verb* tambien para jugadores automaticos (normalmente desactivado).
 (setq *debug-level* 2)         ; Ajusta a 2 el nivel de detalle
 (setq *verb* t)                ; Activa comentarios para seguir la evolucion de la partida
