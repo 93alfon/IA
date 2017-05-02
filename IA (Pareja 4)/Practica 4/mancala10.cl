@@ -754,32 +754,54 @@
 (defun negamax-a-b (estado profundidad-max f-eval)
   (let* ((oldverb *verb*)
        (*verb* (if *debug-nmx* *verb* nil))
-       (estado2 (negamax-alfa-beta estado 0 t profundidad-max f-eval +min-val+ +max-val+)
+       (estado2 (negamax-alfa-beta estado 0 t profundidad-max f-eval +min-val+ +max-val+))
        (*verb* oldverb))
   estado2))
 
-(defun negamax-alfa-beta (estado profundidad devolver-movimiento profundidad-max f-eval alfa beta)
-  (cond ((>= profundidad profundidad-max)
-         (unless devolver-movimiento  (funcall f-eval estado)))
-        (t
-         (let ((sucesores (generar-sucesores estado profundidad))
-                (mejor-sucesor nil))
-           (cond ((null sucesores)
-                  (unless devolver-movimiento  (funcall f-eval estado)))
-                 (t
-                  (loop for sucesor in sucesores do
-                    (let* ((result-sucesor (- (negamax-alfa-beta sucesor (1+ profundidad)
-                                        nil profundidad-max f-eval (- beta) (- alfa)))))
-                      ;(format t "~% Nmx-1 Prof:~A result-suc ~3A de suc ~A, mejor=~A" profundidad result-sucesor (estado-tablero sucesor) mejor-valor)
-                      (when (> result-sucesor alfa)
-                        (setq alfa result-sucesor)
-                        (setq mejor-sucesor  sucesor))
-                      (when (>= alfa beta)
-                        (return
-                          (if devolver-movimiento mejor-sucesor alfa)))))
-                  (if  devolver-movimiento mejor-sucesor alfa)))))))
+; (defun negamax-alfa-beta (estado profundidad devolver-movimiento profundidad-max f-eval alfa beta)
+;   (cond ((>= profundidad profundidad-max)
+;          (unless devolver-movimiento  (funcall f-eval estado)))
+;         (t
+;          (let ((sucesores (generar-sucesores estado profundidad))
+;                 (mejor-sucesor nil))
+;            (cond ((null sucesores)
+;                   (unless devolver-movimiento  (funcall f-eval estado)))
+;                  (t
+;                   (loop for sucesor in sucesores do
+;                     (let* ((result-sucesor (- (negamax-alfa-beta sucesor (1+ profundidad)
+;                                         nil profundidad-max f-eval (- beta) (- alfa)))))
+;                       ;(format t "~% Nmx-1 Prof:~A result-suc ~3A de suc ~A, mejor=~A" profundidad result-sucesor (estado-tablero sucesor) mejor-valor)
+;                       (when (> result-sucesor alfa)
+;                         (setq alfa result-sucesor)
+;                         (setq mejor-sucesor  sucesor))
+;                       (when (>= alfa beta)
+;                         (return
+;                           (if devolver-movimiento mejor-sucesor alfa)))))
+;                   (if  devolver-movimiento mejor-sucesor alfa)))))))
 
-
+(defun negamax-alfa-beta (estado profundidad devolver-movimiento profundidad-max f-eval alfa-valor alfa-sucesor)
+ (cond ((>= profundidad profundidad-max)
+        (unless devolver-movimiento  (funcall f-eval estado)))
+       (t
+        (let ((sucesores (generar-sucesores estado profundidad))
+              (mejor-valor +min-val+)
+              (mejor-sucesor nil))
+          (cond ((null sucesores)
+                 (unless devolver-movimiento  (funcall f-eval estado)))
+                (t
+                 (loop for sucesor in sucesores do
+                   (let* ((result-sucesor (- (negamax-alfa-beta sucesor (1+ profundidad)
+                                       nil profundidad-max f-eval (- alfa-valor) alfa-sucesor))))
+                     ;(format t "~% Nmx-1 Prof:~A result-suc ~3A de suc ~A, mejor=~A" profundidad result-sucesor (estado-tablero sucesor) mejor-valor)
+                     (when (>= (- alfa-valor) (- result-sucesor))
+                       (return
+                         (if devolver-movimiento alfa-sucesor alfa-valor)))
+                     (when (> result-sucesor mejor-valor)
+                       (setq mejor-valor result-sucesor)
+                       (setq mejor-sucesor  sucesor)
+                       (setq alfa-valor result-sucesor)
+                       (setq alfa-sucesor  sucesor))))
+                 (if  devolver-movimiento mejor-sucesor mejor-valor)))))))
 ;;; ------------------------------------------------------------------------------------------
 ;;; FUNCIONES AUXILIARES
 ;;; ------------------------------------------------------------------------------------------
@@ -819,7 +841,7 @@
 ;;; ------------------------------------------------------------------------------------------
 (defun f-j-nmx (estado profundidad-max f-eval)
 (negamax-a-b estado profundidad-max f-eval))
-;;;(negamax estado profundidad-max f-eval))
+;(negamax estado profundidad-max f-eval))
 
 
 ;;; f-juego para jugador chulo remoto (boaster)
@@ -1022,3 +1044,46 @@
 
 ;(partida 2 2 (list *jdr-nmx-Bueno* *challenger-remoto*))
 ;(partida 2 2 (list *boaster-remoto* *jdr-humano*))
+
+
+
+
+
+;(time (partida 2 2 (list *jdr-nmx-Bueno* *jdr-nmx-Bueno*)))
+
+
+;;;  - lado:  Lado del tablero a cuyo jugador le corresponde comenzar a jugar
+;;;           0=2=Jugador1 (abajo);  1=Jugador2 (arriba)
+;;;  - profundidad-max: maxima profundidad de la busqueda negamax
+;;;  - lst-jug-partida: (Jugador1 Jugador2)
+;;;    Lista compuesta por los dos structs jugador que tomaran parte en la partida.
+;;;  - filas: Parametro opcional que fuerza situacion inicial tablero
+;;; DEVUELVE: resultado de la partida (0=tablas, 1=gana Jugador1, 2=gana Jugador2)
+
+
+(setf *alfdav* (make-jugador
+	:nombre 'caca
+	:f-juego #'f-j-nmx
+	:f-eval #'alfdav))
+
+
+(defun alfdav (estado)
+  	(-	(get-fichas (estado-tablero estado)(estado-lado-sgte-jugador estado) 6)
+  		(get-fichas (estado-tablero estado)(lado-contrario (estado-lado-sgte-jugador estado)) 6)))
+
+; JUGADOR ALFDAV
+(setf *mi-jugador* (make-jugador
+	:nombre 'alfda
+	:f-juego #'f-j-nmx
+	:f-eval #'joder))
+
+
+
+(defun joder (estado)
+  (if (juego-terminado-p estado)
+      (if (> (cuenta-fichas (estado-tablero estado) (estado-lado-sgte-jugador estado) 0) 18)
+          10
+        -10)
+
+        (* 10 (- (get-fichas (estado-tablero estado)(estado-lado-sgte-jugador estado) *long-fila*)
+                 (get-fichas (estado-tablero estado)(lado-contrario (estado-lado-sgte-jugador estado)) *long-fila*)))))
